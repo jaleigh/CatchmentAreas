@@ -7,19 +7,31 @@ import { MapContainer, Marker, Popup, TileLayer, useMapEvents } from "react-leaf
 import { schools } from "../../data/schools";
 import { useState } from 'react';
 import { LatLngExpression } from "leaflet";
+import { postcodes, PostcodeData } from "../../data/postcodes";
+import L from 'leaflet';
+import { Grid, Grid2 } from "@mui/material";
 
-interface Destination {
+interface Journey {
   id: number;
   name: string;
   distance: number;
   duration: number;
+  journey: string;
 }
 
 interface Routes {
   id: number;
   startPoint: LatLngExpression;
-  schoolDists: Destination[];
+  schoolDists: Journey[];
 }
+
+const diskIcon = L.divIcon({
+  className: 'custom-disk-icon',
+  html: '<div style="background-color: red; width: 10px; height: 10px; border-radius: 50%;"></div>',
+  iconSize: [10, 10],
+  iconAnchor: [5, 5]
+});
+
 const Map = () => {
 
   const [routes, setRoutes] = useState<Routes>({ id: 0, startPoint: [0, 0], schoolDists: [] });
@@ -49,41 +61,45 @@ const Map = () => {
   }
 
   return (
-    <MapContainer
-      id="map"
-      center={[50.84078, -0.14691]}
-      zoom={13}
-      scrollWheelZoom={true}
-      style={{ height: "100%", width: "100%", cursor: "crosshair" }}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {
-        schools.map((school) => (
-          <Marker key={school.name} position={[school.lat, school.lng]}>
-            <Popup>{school.name}</Popup>
-          </Marker>
-        ))
-      }
-      <ClickHandler />
-      {
-        routes.schoolDists.length > 0 &&
-        <Popup key="dist-popup" position={routes.startPoint}>
-            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-            {
-            routes.schoolDists?.map((dest: Destination) => (
-              <div key={dest.id} style={{ marginBottom: '1rem' }}>
-              <div style={{ fontWeight: 'bold' }}>{dest.name}</div>
-              <div style={{ paddingLeft: '1rem' }}>{dest.distance} miles</div>
-              <div style={{ paddingLeft: '1rem' }}>{dest.duration} minutes</div>
+    <>
+      <Grid container spacing={2} style={{ height: '100%' }}>
+        <Grid item xs={3} style={{ height: '100%' }}>
+          <div style={{ height: '100%', backgroundColor: 'white', overflowY: 'auto', padding: '10px' }}>
+            <h2>Route Information</h2>
+            {routes.schoolDists?.map((dest: Journey) => (
+              <div key={dest.name} style={{ marginBottom: '1rem' }}>
+                <div style={{ fontWeight: 'bold' }}>{dest.name} - {dest.journey}</div>
+                <div style={{ paddingLeft: '1rem' }}>{dest.distance} miles</div>
+                <div style={{ paddingLeft: '1rem' }}>{dest.duration} minutes</div>
               </div>
             ))}
           </div>
-        </Popup>
-      }
-    </MapContainer>
+        </Grid>
+        <Grid item xs={9} style={{ height: '100%' }}>
+          <MapContainer
+            id="map"
+            center={[50.84078, -0.14691]}
+            zoom={13}
+            scrollWheelZoom={true}
+            style={{ height: "100%", width: "100%", cursor: "crosshair" }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {schools.map((school) => (
+              <Marker key={school.name} position={[school.lat, school.lng]}>
+                <Popup>{school.name}</Popup>
+              </Marker>
+            ))}
+            <ClickHandler />
+            {postcodes.map((p: PostcodeData) => (
+              <Marker key={p.postcode} position={[p.lat, p.lng]} icon={diskIcon} />
+            ))}
+          </MapContainer>
+        </Grid>
+      </Grid>
+    </>
   );
 };
 
