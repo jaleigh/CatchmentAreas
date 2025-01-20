@@ -7,7 +7,7 @@ import { MapContainer, Marker, Popup, TileLayer, useMapEvents, Polyline } from "
 import { schools } from "../../data/schools";
 import { useState } from 'react';
 import { LatLngExpression } from "leaflet";
-import { postcodes, PostcodeData } from "../../data/postcodes";
+import { clusteredPostcodes, PostcodeData } from "../../data/postcodes";
 import L from 'leaflet';
 import { Grid, Grid2 } from "@mui/material";
 
@@ -40,7 +40,7 @@ const Map = () => {
 
   const ClickHandler = () => {
     useMapEvents({
-      click: (event) => {
+      click: (event: any) => {
         const { lat, lng } = event.latlng;
         // get the routes to the schools from the click location
         setRoutes({ id: 0, startPoint: [lat, lng], schoolJourneys: [] });
@@ -66,7 +66,7 @@ const Map = () => {
     <>
       <Grid container spacing={2} style={{ height: '100%' }}>
         <Grid item xs={3} style={{ height: '100%' }}>
-          <div style={{ height: '100%', backgroundColor: 'white', overflowY: 'auto', padding: '10px' }}>
+          <div style={{ backgroundColor: 'white', overflowY: 'auto', padding: '10px' }}>
             <h2>Route Information</h2>
             {routes.schoolJourneys?.map((dest: Journey) => (
               <div key={dest.name} style={{ marginBottom: '1rem' }}>
@@ -95,7 +95,7 @@ const Map = () => {
               </Marker>
             ))}
             <ClickHandler />
-            {postcodes.map((p: PostcodeData) => (
+            {clusteredPostcodes.map((p: PostcodeData) => (
               <Marker key={p.postcode} position={[p.lat, p.lng]} icon={diskIcon} />
             ))}
             {routes.schoolJourneys?.map((dest: Journey) => (
