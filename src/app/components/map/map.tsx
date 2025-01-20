@@ -3,7 +3,7 @@
 import "leaflet/dist/leaflet.css";
 import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.webpack.css";
 import "leaflet-defaulticon-compatibility";
-import { MapContainer, Marker, Popup, TileLayer, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, Popup, TileLayer, useMapEvents, Polyline } from "react-leaflet";
 import { schools } from "../../data/schools";
 import { useState } from 'react';
 import { LatLngExpression } from "leaflet";
@@ -16,13 +16,15 @@ interface Journey {
   name: string;
   distance: number;
   duration: number;
-  journey: string;
+  journeyType: string;
+  route: LatLngExpression[];
+  colour: string;
 }
 
 interface Routes {
   id: number;
   startPoint: LatLngExpression;
-  schoolDists: Journey[];
+  schoolJourneys: Journey[];
 }
 
 const diskIcon = L.divIcon({
@@ -34,20 +36,20 @@ const diskIcon = L.divIcon({
 
 const Map = () => {
 
-  const [routes, setRoutes] = useState<Routes>({ id: 0, startPoint: [0, 0], schoolDists: [] });
+  const [routes, setRoutes] = useState<Routes>({ id: 0, startPoint: [0, 0], schoolJourneys: [] });
 
   const ClickHandler = () => {
     useMapEvents({
       click: (event) => {
         const { lat, lng } = event.latlng;
         // get the routes to the schools from the click location
-        setRoutes({ id: 0, startPoint: [lat, lng], schoolDists: [] });
+        setRoutes({ id: 0, startPoint: [lat, lng], schoolJourneys: [] });
         const fetchDistances = async () => {
           const response = await fetch(`/api/distances?lat=${lat}&lng=${lng}`);
           if (response.ok) {
             const data = await response.json();
             // convert data to Routes and lat, lng
-            routes.schoolDists = data.schoolDists;
+            routes.schoolJourneys = data.schoolJourneys;
             routes.startPoint = [lat, lng];
             setRoutes(routes);
           } else {
@@ -66,9 +68,9 @@ const Map = () => {
         <Grid item xs={3} style={{ height: '100%' }}>
           <div style={{ height: '100%', backgroundColor: 'white', overflowY: 'auto', padding: '10px' }}>
             <h2>Route Information</h2>
-            {routes.schoolDists?.map((dest: Journey) => (
+            {routes.schoolJourneys?.map((dest: Journey) => (
               <div key={dest.name} style={{ marginBottom: '1rem' }}>
-                <div style={{ fontWeight: 'bold' }}>{dest.name} - {dest.journey}</div>
+                <div style={{ fontWeight: 'bold' }}>{dest.name} - {dest.journeyType}</div>
                 <div style={{ paddingLeft: '1rem' }}>{dest.distance} miles</div>
                 <div style={{ paddingLeft: '1rem' }}>{dest.duration} minutes</div>
               </div>
@@ -95,6 +97,10 @@ const Map = () => {
             <ClickHandler />
             {postcodes.map((p: PostcodeData) => (
               <Marker key={p.postcode} position={[p.lat, p.lng]} icon={diskIcon} />
+            ))}
+            {routes.schoolJourneys?.map((dest: Journey) => (
+              // render a poly line for the journey to each school in a different color
+              <Polyline key={"p" + dest.name} positions={dest.route} color={dest.colour}/>
             ))}
           </MapContainer>
         </Grid>

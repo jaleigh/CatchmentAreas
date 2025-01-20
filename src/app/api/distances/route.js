@@ -40,18 +40,36 @@ export async function GET(Request) {
     })
 
     // Add your own result handling here
-    let response = {'schoolDists': []};
+    let response = {'schoolJourneys': []};
     if (!result.distances[0]) {
       console.log("No distances returned");
     }
     for (let i = 1; i < result.distances[0].length; i++) {
-      response.schoolDists.push({
+      response.schoolJourneys.push({
         name: schools[i-1].name,
-        journey: "walking",
+        colour: schools[i-1].colour,
+        journeyType: "walking",
         distance: (result.distances[0][i] * 0.000621371).toFixed(2),
         duration: (result.durations[0][i] / 60).toFixed(2),
         location: {'lng': schools[i-1].lng, 'lat': schools[i-1].lat}
       });
+
+      // get the route between the two points
+      const directions = new Openrouteservice.Directions({
+        api_key: process.env.OPENROUTE_API_KEY,
+        host: process.env.OPENROUTE_SERVICE
+      });
+
+      let route = await directions.calculate({
+        coordinates: [
+          [lng, lat],
+          [schools[i-1].lng, schools[i-1].lat]
+        ],
+        profile: "foot-walking",
+        format: "geojson"
+      });
+
+      response.schoolJourneys[i-1].route = route;
     }
 
     return new Response(JSON.stringify(response), {
