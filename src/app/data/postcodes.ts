@@ -1,6 +1,6 @@
 export interface LngLat {
-  lng: Number,
-  lat: Number
+  lng: number,
+  lat: number
 };
 
 export interface Journey {

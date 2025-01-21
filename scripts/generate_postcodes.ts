@@ -16,14 +16,14 @@ function loadPostcodesFromCSV(filePath: string) {
   }));
 }
 
-const filterPostcodesToCity = function(postcodes: any) {
+const filterPostcodesToCity = function(postcodes: any, skip: number = 1) {
   const bBox = {
     tl: {lat: 50.873210, lng: -0.234723},
     br: {lat: 50.797310, lng: -0.030338}
   }
 
   let filteredPostcodes = [];
-  for (let i = 0; i < postcodes.length; ++i) {
+  for (let i = 0; i < postcodes.length; i+=skip) {
     // filter out postcodes outside the core of the city
     if (postcodes[i].lat < bBox.br.lat || postcodes[i].lat > bBox.tl.lat || postcodes[i].lng < bBox.tl.lng || postcodes[i].lng > bBox.br.lng) {
       continue;
@@ -136,11 +136,11 @@ const addJourneyData = async function(postcodes: any) {
 };
 
 const postcodes = loadPostcodesFromCSV('./postcodes.csv');
-const filteredPostcodes = filterPostcodesToCity(postcodes);
+const filteredPostcodes = filterPostcodesToCity(postcodes, 1);
 
-const clusteredPostcodes = clusterPostcodes(filteredPostcodes, 5000);
+const clusteredPostcodes = clusterPostcodes(filteredPostcodes, 3000);
 
-//await addJourneyData(filteredPostcodes);
+await addJourneyData(filteredPostcodes);
 await addJourneyData(clusteredPostcodes);
 
 const output = filteredPostcodes.map((postcode: any) => 
