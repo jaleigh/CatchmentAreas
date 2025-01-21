@@ -1,12 +1,15 @@
+// @ts-ignore
 import Openrouteservice from 'openrouteservice-js';
 import { schools } from "../../data/schools";
+import { Journey } from "../../data/postcodes";
 
-export async function generateJounreyData(lng, lat) {
+export async function generateJounreyData(lng: Number, lat: Number) {
   const distMatrix = new Openrouteservice.Matrix({
     api_key: process.env.OPENROUTE_API_KEY,
     host: process.env.OPENROUTE_SERVICE
   });
 
+  let locations = [[lng, lat]];
   for (let school of schools) {
     locations.push([school.lng, school.lat]);
   }
@@ -24,7 +27,7 @@ export async function generateJounreyData(lng, lat) {
     console.log("No distances returned");
   }
 
-  const response = {'schoolJourneys': []};
+  const response: { schoolJourneys: Journey[] } = { schoolJourneys: [] };
 
   // populate the routes that generated the distances/times
   for (let i = 1; i < result.distances[0].length; i++) {
@@ -48,25 +51,25 @@ export async function generateJounreyData(lng, lat) {
       name: schools[i-1].name,
       colour: schools[i-1].colour,
       journeyType: "walking",
-      distance: (result.distances[0][i] * 0.000621371).toFixed(2),
-      duration: (result.durations[0][i] / 60).toFixed(2),
+      distance: result.distances[0][i] * 0.000621371,
+      duration: result.durations[0][i] / 60,
       location: {'lng': schools[i-1].lng, 'lat': schools[i-1].lat},
-      route: route.geo // this needs to be [number, number] Lat, Lng pairs
+      route: route.features[0].geometry.coordinates.map((p: any) => [p[1], p[0]]) // this needs to be [Lat, Lng] pairs for polyline
     });
   }
 
   return response;
 }
 
-export async function GET(Request) {
+export async function GET(Request: any) {
   try {
     // request a route from openstreetmap between the two points
-    console.log("Requesting route from OpenRouteService", process.env.OPENROUTE_SERVICE);
-
     const locations = [];
     const url = new URL(Request.url);
-    const lng = parseFloat(url.searchParams.get('lng'));
-    const lat = parseFloat(url.searchParams.get('lat'));
+    const lng = parseFloat(url.searchParams.get('lng') || '');
+    const lat = parseFloat(url.searchParams.get('lat') || '');
+
+    console.log(`Requesting route from OpenRouteService lng: ${lng} ${lat}`);
 
     if (!isNaN(lng) && !isNaN(lat)) {
       locations.push([lng, lat]);
@@ -86,7 +89,7 @@ export async function GET(Request) {
         "content-type": "application/json",
       },
     });
-  } catch (err) {
+  } catch (err: any) {
     console.log("An error occurred: " + err.message)
     return new Response(err.response, {
       status: 500,

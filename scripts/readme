@@ -1,0 +1,2 @@
+To run the generate_postcodes.ts use command:
+```npx tsx generate_postcodes.ts```
