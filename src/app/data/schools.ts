@@ -54,7 +54,7 @@ export const schools: School[] = [
     entrances: [],
     colour: 'yellow'
   },
-  {
+  /*{
     name: 'Kings School',
     lng: -0.19195826296668858,
     lat: 50.85370861230319,
@@ -67,7 +67,7 @@ export const schools: School[] = [
     lat: 50.8371715366439,
     entrances: [],
     colour: 'brown'
-  },
+  },*/
   {
     name: 'BACA',
     lng: -0.09278489104966146,

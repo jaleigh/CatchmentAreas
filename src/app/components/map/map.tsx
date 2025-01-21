@@ -5,11 +5,14 @@ import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility
 import "leaflet-defaulticon-compatibility";
 import { MapContainer, Marker, Popup, TileLayer, useMapEvents, Polyline } from "react-leaflet";
 import { schools } from "../../data/schools";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LatLngExpression } from "leaflet";
-import { clusteredPostcodes, PostcodeData } from "../../data/postcodes";
 import L from 'leaflet';
 import { Grid } from "@mui/material";
+import { AppBar, Toolbar, Typography } from '@mui/material';
+import Button from '@mui/material/Button';
+import dynamic from 'next/dynamic';
+import { PostcodeData } from "../../data/postcodes";
 
 interface Journey {
   id: number;
@@ -28,16 +31,34 @@ interface Routes {
   schoolJourneys: Journey[];
 }
 
-const diskIcon = L.divIcon({
+const diskIcon = (color: string) => L.divIcon({
   className: 'custom-disk-icon',
-  html: '<div style="background-color: red; width: 10px; height: 10px; border-radius: 50%;"></div>',
+  html: `<div style="background-color: ${color}; width: 10px; height: 10px; border-radius: 50%;"></div>`,
   iconSize: [10, 10],
   iconAnchor: [5, 5]
 });
 
+const loadData = async () => {
+  const data = await import('../../data/clusters.json');
+  return data.default as PostcodeData[];
+};
+
 const Map = () => {
 
+  const [sortedPostcodes, setSortedPostcodes] = useState<PostcodeData[]>([]);
   const [routes, setRoutes] = useState<Routes>({ id: 0, startPoint: [0, 0], schoolJourneys: [] });
+  const [renderPostcodes, setRenderPostcodes] = useState<number>(1);
+
+  useEffect(() => {
+    loadData().then((data) => {
+      // sort the postcode journey so the shortes distance is index 0
+      const sorted = data.map((p: PostcodeData) => {
+        return {...p, journeys: p.journeys ? p.journeys.sort((a, b) => (a.distance as number) - (b.distance as number)) : []};
+      });
+      setSortedPostcodes(sorted);
+    });
+  }, []);
+
 
   const ClickHandler = () => {
     useMapEvents({
@@ -81,6 +102,14 @@ const Map = () => {
       <Grid container spacing={2} style={{ height: '100%' }}>
         <Grid item xs={2} style={{ height: '100%' }}>
           <div style={{ backgroundColor: 'white', overflowY: 'auto', padding: '10px' }}>
+            <h2>Colours</h2>
+            <ul>
+              {schools.map((school) => (
+                <li key={school.name} style={{ color: school.colour }}>
+                  {school.name}: {school.colour}
+                </li>
+              ))}
+            </ul>
             <h2>Route Information</h2>
             {routes.schoolJourneys?.map((dest: Journey) => (
               <div key={dest.name} style={{ marginBottom: '1rem' }}>
@@ -112,6 +141,33 @@ const Map = () => {
           </div>
         </Grid>
         <Grid item xs={10} style={{ height: '100%' }}>
+          <AppBar position="static">
+            <Toolbar>
+              <Typography variant="h6" style={{ flexGrow: 1 }}>
+              </Typography>
+                <Button color="inherit" onClick={() => {setRenderPostcodes(renderPostcodes ? 0 : 1)}}>
+                {renderPostcodes ? "Hide Postcodes" : "Show Postcodes"}
+                </Button>
+                 <Button color="inherit" onClick={() => {
+                  setRenderPostcodes(2);
+                  setSortedPostcodes([...sortedPostcodes]); // force a render
+                  }}>
+                Closest School
+                </Button>
+                <Button color="inherit" onClick={() => {
+                  setRenderPostcodes(3);
+                  setSortedPostcodes([...sortedPostcodes]);
+                  }}>
+                2nd Closest School
+                </Button>
+                <Button color="inherit" onClick={() => {
+                  setRenderPostcodes(4);
+                  setSortedPostcodes([...sortedPostcodes]);
+                  }}>
+                3rd Closest School
+                </Button>
+            </Toolbar>
+          </AppBar>
           <MapContainer
             id="map"
             center={[50.84078, -0.14691]}
@@ -129,9 +185,15 @@ const Map = () => {
               </Marker>
             ))}
             <ClickHandler />
-            {clusteredPostcodes.map((p: PostcodeData) => (
-              <Marker key={p.postcode} position={[p.lat, p.lng]} icon={diskIcon} />
-            ))}
+            {renderPostcodes && sortedPostcodes.map((p: PostcodeData) => {
+              // find the closest school
+              let colour = "blue";
+              if (renderPostcodes > 1 && p.journeys) {
+                const closestSchool = p.journeys[renderPostcodes - 2];
+                colour = typeof closestSchool.colour === 'string' ? closestSchool.colour : "blue";
+              }
+                return <Marker key={p.postcode} position={[p.lat, p.lng]} icon={diskIcon(colour)} />;
+            })}
             {routes.schoolJourneys?.map((dest: Journey) => (
               // render a poly line for the journey to each school in a different color
               dest.renderRoute && 
