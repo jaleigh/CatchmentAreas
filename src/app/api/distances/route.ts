@@ -1,19 +1,19 @@
-// @ts-ignore
+// @ts-expect-error this just a script for generating data, who cares about types
 import Openrouteservice from 'openrouteservice-js';
 import { schools, School } from "../../data/schools";
 import { Journey } from "../../data/postcodes";
 
-export async function generateJounreyData(lng: Number, lat: Number) {
+export async function generateJounreyData(lng: number, lat: number) {
   const distMatrix = new Openrouteservice.Matrix({
     api_key: process.env.OPENROUTE_API_KEY,
     host: process.env.OPENROUTE_SERVICE
   });
 
   // schools have multiple entrances so keep track of the school to index to the location array
-  let locations = [[lng, lat]];
+  const locations = [[lng, lat]];
   type LocationMapEntry = { school: School, loc: { lat: number, lng: number } } | null;
-  let locationMap: LocationMapEntry[] = [null];
-  for (let school of schools) {
+  const locationMap: LocationMapEntry[] = [null];
+  for (const school of schools) {
     locations.push([school.lng, school.lat]);
     locationMap.push({school: school, loc: {lat: school.lat, lng: school.lng}});
     school.entrances.forEach((entrance) => {
@@ -22,7 +22,7 @@ export async function generateJounreyData(lng: Number, lat: Number) {
     });
   }
 
-  let result = await distMatrix.calculate({
+  const result = await distMatrix.calculate({
     locations: locations,
     metrics: ["distance", "duration"],
     profile: "foot-walking", // options are cycling-regular, foot-walking, driving-car
@@ -63,7 +63,7 @@ export async function generateJounreyData(lng: Number, lat: Number) {
       host: process.env.OPENROUTE_SERVICE
     });
 
-    let route = await directions.calculate({
+    const route = await directions.calculate({
       coordinates: [
         [lng, lat],
         [info.loc.lng, info.loc.lat]

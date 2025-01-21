@@ -8,12 +8,17 @@ import { schools } from "../../data/schools";
 import { useState, useEffect } from 'react';
 import { LatLngExpression } from "leaflet";
 import L from 'leaflet';
-import { Grid } from "@mui/material";
-import { AppBar, Toolbar, Typography } from '@mui/material';
+import { Grid, IconButton, TextField } from "@mui/material";
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { AppBar, Toolbar, Typography, Tooltip } from '@mui/material';
 import Button from '@mui/material/Button';
 import dynamic from 'next/dynamic';
 import { PostcodeData } from "../../data/postcodes";
 import { Journey } from "../../data/postcodes";
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
 
 interface JourneyUI extends Journey {
   renderRoute: boolean;
@@ -25,6 +30,15 @@ interface Routes {
   schoolJourneys: JourneyUI[];
 }
 
+enum RenderOptions {
+  HidePostcodes = 0,
+  ShowPostcodes = 1,
+  ClosestSchool = 2,
+  SecondClosestSchool = 3,
+  ThirdClosestSchool = 4,
+  showDistanceMap = 5
+};
+
 const diskIcon = (color: string) => L.divIcon({
   className: 'custom-disk-icon',
   html: `<div style="background-color: ${color}; width: 10px; height: 10px; border-radius: 50%;"></div>`,
@@ -33,7 +47,7 @@ const diskIcon = (color: string) => L.divIcon({
 });
 
 const loadData = async () => {
-  const data = await import('../../data/postcodes_half.json');
+  const data = await import('../../data/clusters.json');
   return data.default as PostcodeData[];
 };
 
@@ -41,8 +55,10 @@ const Map = () => {
 
   const [sortedPostcodes, setSortedPostcodes] = useState<PostcodeData[]>([]);
   const [routes, setRoutes] = useState<Routes>({ id: 0, startPoint: [0, 0], schoolJourneys: [] });
-  const [renderPostcodes, setRenderPostcodes] = useState<number>(1);
+  const [renderOption, setRenderOption] = useState<RenderOptions>(RenderOptions.ShowPostcodes);
   const [apiAvailable, setApiAvailable] = useState<boolean>(false);
+  const [selectedSchool, setSelectedSchool] = useState('');
+  const [maxDistance, setMaxDistance] = useState(4);
 
   useEffect(() => {
     loadData().then((data) => {
@@ -142,27 +158,59 @@ const Map = () => {
             <Toolbar>
               <Typography variant="h6" style={{ flexGrow: 1 }}>
               </Typography>
-                <Button color="inherit" onClick={() => {setRenderPostcodes(renderPostcodes ? 0 : 1)}}>
-                {renderPostcodes ? "Hide Postcodes" : "Show Postcodes"}
+                <Button color="inherit" onClick={() => {setRenderOption(renderOption ? 0 : 1)}}>
+                {renderOption != RenderOptions.HidePostcodes ? "Hide Postcodes" : "Show Postcodes"}
                 </Button>
                  <Button color="inherit" onClick={() => {
-                  setRenderPostcodes(2);
+                  setRenderOption(RenderOptions.ClosestSchool);
                   setSortedPostcodes([...sortedPostcodes]); // force a render
                   }}>
                 Closest School
                 </Button>
                 <Button color="inherit" onClick={() => {
-                  setRenderPostcodes(3);
+                  setRenderOption(RenderOptions.SecondClosestSchool);
                   setSortedPostcodes([...sortedPostcodes]);
                   }}>
                 2nd Closest School
                 </Button>
                 <Button color="inherit" onClick={() => {
-                  setRenderPostcodes(4);
+                  setRenderOption(RenderOptions.ThirdClosestSchool);
                   setSortedPostcodes([...sortedPostcodes]);
                   }}>
                 3rd Closest School
                 </Button>
+                <FormControl variant="outlined" style={{ minWidth: 120, marginLeft: '10px' }}>
+                  <InputLabel id="school-select-label">Schools</InputLabel>
+                  <Select
+                  labelId="school-select-label"
+                  id="school-select"
+                  label="Schools"
+                  onChange={(event) => {
+                    const selectedSchool = schools.find(school => school.name === event.target.value);
+                    setSelectedSchool(selectedSchool?.name || '');
+                    setRenderOption(RenderOptions.showDistanceMap);
+                  }}
+                  >
+                  {schools.map((school) => (
+                    <MenuItem key={school.name} value={school.name}>
+                    {school.name}
+                    </MenuItem>
+                  ))}
+                  </Select>
+                </FormControl>
+                <TextField
+                  label="Max Distance (miles)"
+                  type="number"
+                  value={maxDistance}
+                  onChange={(event) => setMaxDistance(parseFloat(event.target.value))}
+                  style={{ padding: '2px', marginLeft: '10px', width: '100px' }}
+                />
+                <Tooltip title="Select the school from the drop down to see the distances to each school, red is the furthest (set in the text box), green is the closest">
+                  <IconButton color="inherit">
+                    <HelpOutlineIcon />
+                  </IconButton>
+                </Tooltip>
+                
             </Toolbar>
           </AppBar>
           <MapContainer
@@ -182,13 +230,46 @@ const Map = () => {
               </Marker>
             ))}
             <MapClickHandler />
-            {renderPostcodes && sortedPostcodes.map((p: PostcodeData) => {
-              // find the closest school
+            {(renderOption == RenderOptions.ShowPostcodes ||
+             renderOption == RenderOptions.ClosestSchool ||
+             renderOption == RenderOptions.SecondClosestSchool ||
+             renderOption == RenderOptions.ThirdClosestSchool) && 
+             sortedPostcodes.map((p: PostcodeData) => {
+              // render the closest school for each marker
               let colour = "blue";
-              if (renderPostcodes > 1 && p.journeys) {
-                const closestSchool = p.journeys[renderPostcodes - 2];
+              if (renderOption > RenderOptions.ShowPostcodes && p.journeys) {
+                const closestSchool = p.journeys[renderOption as number - 2];
                 colour = typeof closestSchool.colour === 'string' ? closestSchool.colour : "blue";
               }
+              return <Marker
+                key={p.postcode}
+                position={[p.lat, p.lng]}
+                icon={diskIcon(colour)}
+                eventHandlers={{
+                  click: () => {
+                    setRoutes({
+                      id: 0,
+                      startPoint: [p.lat, p.lng],
+                      schoolJourneys: p.journeys ? p.journeys.map((j) => ({ ...j, renderRoute: true, id: 0, colour: j.colour || 'white' })) : []
+                    });
+                  }}}
+                />
+            })}
+            {renderOption == RenderOptions.showDistanceMap && 
+            selectedSchool &&
+            sortedPostcodes.map((p: PostcodeData) => {
+              // render the distance for each marker to the selected school
+              const distance = p.journeys?.find(j => j.name === selectedSchool)?.distance;
+              const convertDistToColor = (distance: number) => {
+                const minDistance = 0.5;
+                const clampedDistance = Math.max(minDistance, Math.min(maxDistance, distance));
+                const ratio = (clampedDistance - minDistance) / (maxDistance - minDistance);
+                const red = Math.floor(255 * ratio);
+                const green = Math.floor(255 * (1 - ratio));
+                return `rgb(${red},${green},0)`;
+              };
+
+              const colour = convertDistToColor(distance || 0);
               return <Marker
                 key={p.postcode}
                 position={[p.lat, p.lng]}
