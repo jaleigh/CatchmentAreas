@@ -47,7 +47,11 @@ const diskIcon = (color: string) => L.divIcon({
 });
 
 const loadData = async () => {
-  const data = await import('../../data/postcodes_half.json');
+  const part1 = await import('../../data/postcodes_half_part1.json').then(module => module.default as PostcodeData[]);
+  const part2 = await import('../../data/postcodes_half_part2.json').then(module => module.default as PostcodeData[]);
+  const data = {
+    default: [...part1, ...part2]
+  };
   return data.default as PostcodeData[];
 };
 
