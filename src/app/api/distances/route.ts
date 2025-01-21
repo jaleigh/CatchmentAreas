@@ -4,6 +4,7 @@ import { schools, School } from "../../data/schools";
 import { Journey } from "../../data/postcodes";
 
 // Configure the API route to be static or dynamic (MUST set to static for deployment as we are only deploying static sites)
+// COMMENT OUT TO ACTUALLY USE
 export const dynamic = "force-static"; // or "force-dynamic"
 export const revalidate = 60; // Revalidate every 60 seconds
 
