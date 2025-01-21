@@ -1,2 +1,4 @@
 To run the generate_postcodes.ts use command:
 ```npx tsx generate_postcodes.ts```
+
+don't forget to add the "OPENROUTE_SERVICE": "http://ors-app:8082/ors"
