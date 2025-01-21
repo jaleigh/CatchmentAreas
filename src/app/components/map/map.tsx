@@ -107,7 +107,7 @@ const Map = () => {
                 </li>
               ))}
             </ul>
-            <h2 style={{ fontWeight: 'bold', paddingTop: '5px' }}>Route Information</h2>
+            <h2 style={{ fontWeight: 'bold', paddingTop: '10px' }}>Route Information</h2>
             {routes.schoolJourneys?.map((dest: JourneyUI) => (
               <div key={dest.name} style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
