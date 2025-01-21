@@ -13,22 +13,16 @@ import { AppBar, Toolbar, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
 import dynamic from 'next/dynamic';
 import { PostcodeData } from "../../data/postcodes";
+import { Journey } from "../../data/postcodes";
 
-interface Journey {
-  id: number;
-  name: string;
-  distance: number;
-  duration: number;
-  journeyType: string;
-  route: LatLngExpression[];
-  colour: string;
+interface JourneyUI extends Journey {
   renderRoute: boolean;
-}
+};
 
 interface Routes {
   id: number;
   startPoint: LatLngExpression;
-  schoolJourneys: Journey[];
+  schoolJourneys: JourneyUI[];
 }
 
 const diskIcon = (color: string) => L.divIcon({
@@ -39,7 +33,7 @@ const diskIcon = (color: string) => L.divIcon({
 });
 
 const loadData = async () => {
-  const data = await import('../../data/clusters.json');
+  const data = await import('../../data/postcodes_half.json');
   return data.default as PostcodeData[];
 };
 
@@ -48,6 +42,7 @@ const Map = () => {
   const [sortedPostcodes, setSortedPostcodes] = useState<PostcodeData[]>([]);
   const [routes, setRoutes] = useState<Routes>({ id: 0, startPoint: [0, 0], schoolJourneys: [] });
   const [renderPostcodes, setRenderPostcodes] = useState<number>(1);
+  const [apiAvailable, setApiAvailable] = useState<boolean>(false);
 
   useEffect(() => {
     loadData().then((data) => {
@@ -60,28 +55,30 @@ const Map = () => {
   }, []);
 
 
-  const ClickHandler = () => {
+  const MapClickHandler = () => {
     useMapEvents({
       click: (event: any) => {
-        const { lat, lng } = event.latlng;
-        // get the routes to the schools from the click location
-        setRoutes({ id: 0, startPoint: [lat, lng], schoolJourneys: [] });
-        const fetchDistances = async () => {
-          const response = await fetch(`/api/distances?lat=${lat}&lng=${lng}`);
-          if (response.ok) {
-            const data = await response.json();
-            // convert data to Routes and lat, lng
-            routes.schoolJourneys = data.schoolJourneys.map((j: Journey) => {
-              j.renderRoute = true;
-              return j;
-            });
-            routes.startPoint = [lat, lng];
-            setRoutes(routes);
-          } else {
-            console.error('Failed to fetch distances:', response.statusText);
-          }
-        };
-        fetchDistances();
+        if (apiAvailable) {
+          const { lat, lng } = event.latlng;
+          // get the routes to the schools from the click location
+          setRoutes({ id: 0, startPoint: [lat, lng], schoolJourneys: [] });
+          const fetchDistances = async () => {
+            const response = await fetch(`/api/distances?lat=${lat}&lng=${lng}`);
+            if (response.ok) {
+              const data = await response.json();
+              // convert data to Routes and lat, lng
+              routes.schoolJourneys = data.schoolJourneys.map((j: JourneyUI) => {
+                j.renderRoute = true;
+                return j;
+              });
+              routes.startPoint = [lat, lng];
+              setRoutes(routes);
+            } else {
+              console.error('Failed to fetch distances:', response.statusText);
+            }
+          };
+          fetchDistances();
+        }
       }
     });
     return null;
@@ -90,7 +87,7 @@ const Map = () => {
   const toggleRenderRoute = (journeyName: string) => {
     const updatedRoutes = {
       ...routes,
-      schoolJourneys: routes.schoolJourneys.map((j: Journey) => 
+      schoolJourneys: routes.schoolJourneys.map((j: JourneyUI) => 
         j.name === journeyName ? { ...j, renderRoute: !j.renderRoute } : j
       )
     };
@@ -110,8 +107,8 @@ const Map = () => {
                 </li>
               ))}
             </ul>
-            <h2>Route Information</h2>
-            {routes.schoolJourneys?.map((dest: Journey) => (
+            <h2 style={{ fontWeight: 'bold', paddingTop: '5px' }}>Route Information</h2>
+            {routes.schoolJourneys?.map((dest: JourneyUI) => (
               <div key={dest.name} style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontWeight: 'bold', color: dest.colour }}>{dest.name} - {dest.journeyType}</div>
@@ -184,7 +181,7 @@ const Map = () => {
                 <Popup>{school.name}</Popup>
               </Marker>
             ))}
-            <ClickHandler />
+            <MapClickHandler />
             {renderPostcodes && sortedPostcodes.map((p: PostcodeData) => {
               // find the closest school
               let colour = "blue";
@@ -192,9 +189,21 @@ const Map = () => {
                 const closestSchool = p.journeys[renderPostcodes - 2];
                 colour = typeof closestSchool.colour === 'string' ? closestSchool.colour : "blue";
               }
-                return <Marker key={p.postcode} position={[p.lat, p.lng]} icon={diskIcon(colour)} />;
+              return <Marker
+                key={p.postcode}
+                position={[p.lat, p.lng]}
+                icon={diskIcon(colour)}
+                eventHandlers={{
+                  click: () => {
+                    setRoutes({
+                      id: 0,
+                      startPoint: [p.lat, p.lng],
+                      schoolJourneys: p.journeys ? p.journeys.map((j) => ({ ...j, renderRoute: true, id: 0, colour: j.colour || 'white' })) : []
+                    });
+                  }}}
+                />
             })}
-            {routes.schoolJourneys?.map((dest: Journey) => (
+            {routes.schoolJourneys?.map((dest: JourneyUI) => (
               // render a poly line for the journey to each school in a different color
               dest.renderRoute && 
               <Polyline key={"p" + dest.name} positions={dest.route} color={dest.colour}/>
