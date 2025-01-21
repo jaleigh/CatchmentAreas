@@ -47,7 +47,7 @@ const diskIcon = (color: string) => L.divIcon({
 });
 
 const loadData = async () => {
-  const data = await import('../../data/clusters.json');
+  const data = await import('../../data/postcodes_half.json');
   return data.default as PostcodeData[];
 };
 
