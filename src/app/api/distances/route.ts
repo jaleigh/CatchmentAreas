@@ -1,6 +1,6 @@
 // @ts-ignore
 import Openrouteservice from 'openrouteservice-js';
-import { schools } from "../../data/schools";
+import { schools, School } from "../../data/schools";
 import { Journey } from "../../data/postcodes";
 
 export async function generateJounreyData(lng: Number, lat: Number) {
@@ -9,9 +9,17 @@ export async function generateJounreyData(lng: Number, lat: Number) {
     host: process.env.OPENROUTE_SERVICE
   });
 
+  // schools have multiple entrances so keep track of the school to index to the location array
   let locations = [[lng, lat]];
+  type LocationMapEntry = { school: School, loc: { lat: number, lng: number } } | null;
+  let locationMap: LocationMapEntry[] = [null];
   for (let school of schools) {
     locations.push([school.lng, school.lat]);
+    locationMap.push({school: school, loc: {lat: school.lat, lng: school.lng}});
+    school.entrances.forEach((entrance) => {
+      locations.push([entrance.lng, entrance.lat]);
+      locationMap.push({school, loc: entrance});
+    });
   }
 
   let result = await distMatrix.calculate({
@@ -27,10 +35,27 @@ export async function generateJounreyData(lng: Number, lat: Number) {
     console.log("No distances returned");
   }
 
+  // find the best entrace for each school
   const response: { schoolJourneys: Journey[] } = { schoolJourneys: [] };
+
+  const bestEntrance: { [key: string]: number } = {};
+  for (let i = 1; i < result.distances[0].length; i++) {
+    const info = locationMap[i];
+    if (!info) continue;
+    if (!bestEntrance[info.school.name] || result.distances[0][i] < result.distances[0][bestEntrance[info.school.name]]) {
+      bestEntrance[info.school.name] = i;
+    }
+  }
 
   // populate the routes that generated the distances/times
   for (let i = 1; i < result.distances[0].length; i++) {
+
+    // pick the best entrance for each school and request the route to this entrance
+    const info = locationMap[i];
+    if (!info || bestEntrance[info.school.name] != i) {
+      // this distance is the best entrance for the school so skip
+      continue;
+    }
 
     // get the route between the two points
     const directions = new Openrouteservice.Directions({
@@ -41,19 +66,19 @@ export async function generateJounreyData(lng: Number, lat: Number) {
     let route = await directions.calculate({
       coordinates: [
         [lng, lat],
-        [schools[i-1].lng, schools[i-1].lat]
+        [info.loc.lng, info.loc.lat]
       ],
       profile: "foot-walking",
       format: "geojson"
     });
 
     response.schoolJourneys.push({
-      name: schools[i-1].name,
-      colour: schools[i-1].colour,
+      name: info.school.name,
+      colour: info.school.colour,
       journeyType: "walking",
       distance: result.distances[0][i] * 0.000621371,
       duration: result.durations[0][i] / 60,
-      location: {'lng': schools[i-1].lng, 'lat': schools[i-1].lat},
+      location: {'lng': info.loc.lng, 'lat': info.loc.lat},
       route: route.features[0].geometry.coordinates.map((p: any) => [p[1], p[0]]) // this needs to be [Lat, Lng] pairs for polyline
     });
   }
