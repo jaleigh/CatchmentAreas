@@ -1,23 +1,22 @@
-const { readFileSync } = require('fs');
-const { parse } = require('csv-parse/sync');
-const { writeFileSync } = require('fs');
-const { kmeans } = require('ml-kmeans');
-const { generateJounreyData } = require('../src/app/api/distances/route.js')
+import { readFileSync, writeFileSync } from 'fs';
+import { parse } from 'csv-parse/sync';
+import { kmeans } from 'ml-kmeans';
+import { generateJounreyData } from '../src/app/api/distances/route.js';
 
-function loadPostcodesFromCSV(filePath) {
+function loadPostcodesFromCSV(filePath: string) {
   const fileContent = readFileSync(filePath, 'utf8');
   const records = parse(fileContent, {
       columns: true,
       skip_empty_lines: true
   });
-  return records.map((record) => ({
+  return records.map((record: any) => ({
       postcode: record.pcd,
       lng: record.long ? parseFloat(record.long) : undefined,
       lat: record.lat ? parseFloat(record.lat) : undefined
   }));
 }
 
-const clusterPostcodes = function(postcodes, numClusters = 200) {
+const clusterPostcodes = function(postcodes: any, numClusters = 200) {
   let data = [];
   let centres = [];
   const skip = Math.round(postcodes.length / numClusters);
@@ -35,6 +34,7 @@ const clusterPostcodes = function(postcodes, numClusters = 200) {
     clusteredPostcodes.push({
       lng: res.centroids[i][0],
       lat: res.centroids[i][1],
+      postcode: undefined,
     });
   }
 
@@ -46,31 +46,55 @@ const clusterPostcodes = function(postcodes, numClusters = 200) {
     }
   }
 
+  clusteredPostcodes = clusteredPostcodes.filter(cluster => cluster.postcode !== undefined && cluster.lng !== 0 && cluster.lat !== 0);
+
+  // make sure all clusters are unique - kmeans init probably wasn't very good
+  const uniqueClusters = new Set();
+  clusteredPostcodes = clusteredPostcodes.filter(cluster => {
+    const key = `${cluster.lng},${cluster.lat}`;
+    if (uniqueClusters.has(key)) {
+      return false;
+    }
+    uniqueClusters.add(key);
+    return true;
+  });
+
   return clusteredPostcodes;
 }
 
-const addJourneyData = async function(postcodes) {
+const addJourneyData = async function(postcodes: any) {
   for (let i = 0; i < postcodes.length; ++i) {
-    // make the request to the journey data to each of the 
-    const rep = await generateJounreyData(postcodes[i].lng, postcodes[i].lat);
-    rep.schoolJourneys.forEach((p) => {
-      postcodes[i].duration = p.duration,
-      postcodes[i].distance = p.distance,
-      postcodes[i].journeyType = p.journeyType,
-      postcodes[i].route = p.route,
-      postcodes[i].location = p.location
-
-      postcodes[i].journeys.push({
-        duration: p.duration,
-        distance: p.distance,
+    // make the request to the journey data to each of the
+    try {
+      const rep = await generateJounreyData(postcodes[i].lng, postcodes[i].lat);
+      rep.schoolJourneys.forEach((p) => {
+        if (!postcodes[i].journeys) {
+          postcodes[i].journeys = [];
+        }
+        postcodes[i].journeys.push({
+          duration: p.duration,
+          distance: p.distance,
+          journeyType: p.journeyType,
+          route: p.route,
+          location: p.location
+        });
       });
+      if (i % 10 == 0) {
+        console.log(`Processed ${i} postcodes`);
+      }
+    } catch (e) {
+      console.error(`Failed to get journey data for ${postcodes[i].postcode} ${postcodes[i].lng}, ${postcodes[i].lat}`);
+    }
   }
-}
+};
+
 const postcodes = loadPostcodesFromCSV('./postcodes.csv');
 
 const clusteredPostcodes = clusterPostcodes(postcodes, 400);
 
-const output = postcodes.map((postcode) => 
+addJourneyData(clusteredPostcodes);
+
+const output = postcodes.map((postcode: any) => 
   `{ postcode: '${postcode.postcode}', lng: ${postcode.lng}, lat: ${postcode.lat} },`
 ).join('\n');
 
