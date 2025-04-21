@@ -8,7 +8,7 @@ import { schools } from "../../data/schools";
 import { useState, useEffect } from 'react';
 import { LatLngExpression } from "leaflet";
 import L from 'leaflet';
-import { Grid, IconButton, TextField } from "@mui/material";
+import { CircularProgress, Grid, IconButton, TextField } from "@mui/material";
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { AppBar, Toolbar, Typography, Tooltip } from '@mui/material';
 import Button from '@mui/material/Button';
@@ -63,6 +63,7 @@ const Map = () => {
   const [apiAvailable, setApiAvailable] = useState<boolean>(false);
   const [selectedSchool, setSelectedSchool] = useState('');
   const [maxDistance, setMaxDistance] = useState(4);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadData().then((data) => {
@@ -71,6 +72,7 @@ const Map = () => {
         return {...p, journeys: p.journeys ? p.journeys.sort((a, b) => (a.distance as number) - (b.distance as number)) : []};
       });
       setSortedPostcodes(sorted);
+      setLoading(false);
     });
   }, []);
 
@@ -217,6 +219,17 @@ const Map = () => {
                 
             </Toolbar>
           </AppBar>
+            {loading && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 1000
+            }}>
+              <CircularProgress />
+            </div>
+            )}
           <MapContainer
             id="map"
             center={[50.84078, -0.14691]}
