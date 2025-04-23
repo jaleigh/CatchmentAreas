@@ -136,12 +136,12 @@ const addJourneyData = async function(postcodes: any) {
 };
 
 const postcodes = loadPostcodesFromCSV('./postcodes.csv');
-const filteredPostcodes = filterPostcodesToCity(postcodes, 1);
+const filteredPostcodes = filterPostcodesToCity(postcodes, 2);
 
 const clusteredPostcodes = clusterPostcodes(filteredPostcodes, 3000);
 
 await addJourneyData(filteredPostcodes);
-await addJourneyData(clusteredPostcodes);
+//await addJourneyData(clusteredPostcodes);
 
 const output = filteredPostcodes.map((postcode: any) => 
   `{ postcode: '${postcode.postcode}', lng: ${postcode.lng}, lat: ${postcode.lat}, journeys: ${JSON.stringify(postcode.journeys)} },`
