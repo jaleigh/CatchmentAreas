@@ -135,12 +135,50 @@ const addJourneyData = async function(postcodes: any) {
   }
 };
 
+const isPointInsidePolygon = function(lng: number, lat: number, polygon: any) {
+  let inside = false;
+  
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const lat0 = polygon[i][0], lng0 = polygon[i][1];
+    const lat1 = polygon[j][0], lng1 = polygon[j][1];
+
+    const intersect = ((lng0 > lng) !== (lng1 > lng)) && (lat < (lat1 - lat0) * (lng - lng0) / (lng1 - lng0) + lat0);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+const addCatchmentToPostcodes = function(postcodes: any) {
+  // add the old and new catchment areas to each postcode
+  const oldCatchments = JSON.parse(readFileSync('../src/app/data/old_catchments.json', 'utf8')).catchments;
+  for (let i = 0; i < postcodes.length; ++i) {
+    for (let j = 0; j < oldCatchments.length; ++j) {
+      if (isPointInsidePolygon(postcodes[i].lng, postcodes[i].lat, oldCatchments[j].coordinates)) {
+        postcodes[i].oldCatchment = oldCatchments[j].name;
+        break;
+      }
+    }
+  }
+
+  const newCatchments = JSON.parse(readFileSync('../src/app/data/new_catchments.json', 'utf8')).catchments;
+  for (let i = 0; i < postcodes.length; ++i) {
+    for (let j = 0; j < newCatchments.length; ++j) {
+      if (isPointInsidePolygon(postcodes[i].lng, postcodes[i].lat, newCatchments[j].coordinates)) {
+        postcodes[i].newCatchment = newCatchments[j].name;
+        break;
+      }
+    }
+  }
+}
+
 const postcodes = loadPostcodesFromCSV('./postcodes.csv');
 const filteredPostcodes = filterPostcodesToCity(postcodes, 2);
 
 const clusteredPostcodes = clusterPostcodes(filteredPostcodes, 3000);
 
 await addJourneyData(filteredPostcodes);
+await addCatchmentToPostcodes(filteredPostcodes);
+
 //await addJourneyData(clusteredPostcodes);
 
 const output = filteredPostcodes.map((postcode: any) => 
