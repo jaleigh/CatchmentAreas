@@ -5,22 +5,29 @@ export interface LngLat {
 
 export type CatchmentName = 'Patcham' | 'StringerVarndean' | 'BrightonAldridge' | 'Longhill' | 'BlatchingtonHove' | 'Portslade';
 export type JourneyName = 'Varndean School' | 'Dorthy Stringer' | 'Hove Park' | 'Blatchington Mill' | 'Patcham High' | 'Longhill High' | 'BACA' | 'PACA';
+export type JourneyType = 'walking' | 'bus';
 
 export interface Journey {
   name: JourneyName
-  journeyType: 'walking' | 'driving' | 'bus',
-  distance: number,
-  duration: number,
+  journeyType: JourneyType,
+  distance: number, // miles
+  duration: number, // minutes
   location: LngLat,
   route: Array<LngLat>
   colour?: string
+  transfers?: number // number of transfers for bus journeys
+};
+
+export interface Journeys {
+  walking?: Array<Journey>,
+  bus?: Array<Journey>
 };
 
 export interface PostcodeData {
   postcode: string,
   lng: number,
   lat: number
-  journeys?: Array<Journey>
+  journeys?: Journeys
   closestPlacement: JourneyName // this is the closest school that you end up at if you get none of your preferences
   oldCatchment?: CatchmentName
   newCatchment?: CatchmentName

@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { parse } from 'csv-parse/sync';
 import { kmeans } from 'ml-kmeans';
-import { generateJounreyData } from '../src/app/api/distances/route.js';
+import { generateJourneyData } from '../src/app/api/distances/route.js';
 
 function loadPostcodesFromCSV(filePath: string) {
   const fileContent = readFileSync(filePath, 'utf8');
@@ -109,14 +109,15 @@ const clusterPostcodes = function(postcodes: any, numClusters = 200) {
 
 const addJourneyData = async function(postcodes: any) {
   for (let i = 0; i < postcodes.length; ++i) {
-    // make the request to the journey data to each of the
+    /*
+    postcodes[i].journeys = {
+      walking: [],
+      bus: []
+    };
     try {
-      const rep = await generateJounreyData(postcodes[i].lng, postcodes[i].lat);
+      const rep = await generateJourneyData(postcodes[i].lng, postcodes[i].lat, 'foot-walking');
       rep.schoolJourneys.forEach((p) => {
-        if (!postcodes[i].journeys) {
-          postcodes[i].journeys = [];
-        }
-        postcodes[i].journeys.push({
+        postcodes[i].journeys.walking.push({
           name: p.name,
           duration: p.duration,
           distance: p.distance,
@@ -126,11 +127,26 @@ const addJourneyData = async function(postcodes: any) {
           colour: p.colour,
         });
       });
-      if (i % 10 == 0) {
-        console.log(`Processed ${i} postcodes`);
-      }
     } catch (e) {
-      console.error(`Failed to get journey data for ${postcodes[i].postcode} ${postcodes[i].lng}, ${postcodes[i].lat}`);
+      console.error(`Failed to get walking data for ${postcodes[i].postcode} ${postcodes[i].lng}, ${postcodes[i].lat} ${e}`);
+    }*/
+
+    postcodes[i].journeys.bus = [];
+    try {
+      const busRep = await generateJourneyData(postcodes[i].lng, postcodes[i].lat, 'public-transport', new Date("2025-05-01T08:50:00Z"));
+      busRep.schoolJourneys.forEach((p) => {
+        postcodes[i].journeys.bus.push({
+          name: p.name,
+          duration: p.duration,
+          distance: p.distance,
+          journeyType: p.journeyType,
+          route: p.route,
+          location: p.location,
+          colour: p.colour,
+        });
+      });
+    } catch (e) {
+      console.error(`Failed to get bus data for ${postcodes[i].postcode} ${postcodes[i].lng}, ${postcodes[i].lat} ${e}`);
     }
   }
 };
@@ -171,27 +187,48 @@ const addCatchmentToPostcodes = function(postcodes: any) {
   }
 }
 
+/*
 const postcodes = loadPostcodesFromCSV('./postcodes.csv');
 const filteredPostcodes = filterPostcodesToCity(postcodes, 2);
+//const clusteredPostcodes = clusterPostcodes(filteredPostcodes, 3000);
 
-const clusteredPostcodes = clusterPostcodes(filteredPostcodes, 3000);
-
-await addJourneyData(filteredPostcodes);
 await addCatchmentToPostcodes(filteredPostcodes);
+writeFileSync('../src/app/data/postcodes.json', JSON.stringify(filteredPostcodes));
+*/
+
+// ors-app runs out of memory it can only do 500 or so before crashing, so read it back in and add missing journey data
+const postcodesData = JSON.parse(readFileSync('../src/app/data/postcodes.json', 'utf8'));
+let processedCnt = 0;
+for (let i = 0; i < postcodesData.length; i++) {
+  if (!postcodesData[i].journeys || postcodesData[i].journeys.walking.length === 0 || postcodesData[i].journeys.bus.length === 0) {
+    await addJourneyData([postcodesData[i]]);
+    ++processedCnt;
+  }
+
+  if (i % 10 == 0) {
+    console.log(`Processed ${i} postcodes`);
+  }
+
+  if (processedCnt % 100 == 0 && processedCnt != 0) {
+    console.log(`postcodes saving to file ${i}`);
+    writeFileSync('../src/app/data/postcodes.json', JSON.stringify(postcodesData));
+  }
+}
 
 //await addJourneyData(clusteredPostcodes);
 
-const output = filteredPostcodes.map((postcode: any) => 
-  `{ postcode: '${postcode.postcode}', lng: ${postcode.lng}, lat: ${postcode.lat}, journeys: ${JSON.stringify(postcode.journeys)} },`
-).join('\n');
+//const output = filteredPostcodes.map((postcode: any) => 
+//  `{ postcode: '${postcode.postcode}', lng: ${postcode.lng}, lat: ${postcode.lat}, journeys: ${JSON.stringify(postcode.journeys)} },`
+//).join('\n');
 
+/*
 const clusterdOutput = clusteredPostcodes.map((postcode) => 
   `{ postcode: '${postcode.postcode}', lng: ${postcode.lng}, lat: ${postcode.lat}, journeys: ${JSON.stringify(postcode.journeys)} },`
 ).join('\n');
+*/
+
+//writeFileSync('./postcodes.txt', output);
+//writeFileSync('./clusters.txt', clusterdOutput);
 
 
-writeFileSync('./postcodes.txt', output);
-writeFileSync('./clusters.txt', clusterdOutput);
-
-writeFileSync('../src/app/data/postcodes.json', JSON.stringify(filteredPostcodes));
-writeFileSync('../src/app/data/clusters.json', JSON.stringify(clusteredPostcodes));
+//writeFileSync('../src/app/data/clusters.json', JSON.stringify(clusteredPostcodes));

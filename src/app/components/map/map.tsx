@@ -8,11 +8,11 @@ import { schools } from "../../data/schools";
 import { useState, useEffect } from 'react';
 import { LatLngExpression } from "leaflet";
 import L from 'leaflet';
-import { CircularProgress, Grid, IconButton, TextField } from "@mui/material";
+import { CircularProgress, Grid, IconButton, TextField, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { AppBar, Toolbar, Typography, Tooltip } from '@mui/material';
 import Button from '@mui/material/Button';
-import { PostcodeData } from "../../data/postcodes";
+import { Journeys, PostcodeData, JourneyType } from "../../data/postcodes";
 import { Catchments, CatchmentBoundary } from "../../data/catchments";
 import { Journey } from "../../data/postcodes";
 import Select from '@mui/material/Select';
@@ -27,6 +27,7 @@ interface JourneyUI extends Journey {
 interface Routes {
   id: number;
   startPoint: LatLngExpression;
+  postcode?: string;
   schoolJourneys: JourneyUI[];
 }
 
@@ -87,12 +88,18 @@ const Map = () => {
   const [selectedSchool, setSelectedSchool] = useState('');
   const [maxDistance, setMaxDistance] = useState(4);
   const [loading, setLoading] = useState(true);
+  const [journeyType, setJourneyType] = useState<JourneyType>('walking');
+  const [infoDialogOpen, setInfoDialogOpen] = useState(true); // Dialog open state
 
   useEffect(() => {
     loadPostcodeData().then((data) => {
       // sort the postcode journey so the shortes distance is index 0
       const sorted = data.map((p: PostcodeData) => {
-        return {...p, journeys: p.journeys ? p.journeys.sort((a, b) => (a.distance as number) - (b.distance as number)) : []};
+        if (p.journeys) {
+          p.journeys.walking = p.journeys?.walking?.sort((a, b) => (a.distance as number) - (b.distance as number));
+          p.journeys.bus = p.journeys?.bus?.sort((a, b) => (a.distance as number) - (b.distance as number));
+        }
+        return p;
       });
       setSortedPostcodes(sorted);
       setLoading(false);
@@ -150,8 +157,43 @@ const Map = () => {
     return `rgb(${red},${green},0)`;
   };
 
+  const handleCloseDialog = () => {
+    setInfoDialogOpen(false); // Close the dialog
+  };
+
   return (
     <>
+      {/* Info Dialog */}
+      <Dialog open={infoDialogOpen} onClose={handleCloseDialog}>
+        <DialogTitle>Welcome to the Map</DialogTitle>
+        <DialogContent>
+          <p style={{ marginBottom: '1rem' }}>
+            This map allows you to explore routes to schools. A blur dot is a postcode. Click on a blue dot to see the route to schools.
+            The left hand panel show the distance and time to each school. These are safe walking distances as determined by OpenRouteService (https://openrouteservice.org/)
+          </p>
+          <p style={{ marginBottom: '1rem' }}>
+            Click on the bus route to load the Brighon and Hove bus website for that postcode to school journey.
+          </p>
+          <p style={{ marginBottom: '1rem' }}>
+            Use the dropdowns to change the catchment boundaries overlays (these aren't exact).
+          </p>
+          <p style={{ marginBottom: '1rem' }}>
+            The Render options drop down allows you to see the closest school, 2nd closest school, 3rd closest school for each postcode.
+          </p>
+          <p style={{ marginBottom: '1rem' }}>
+            The closest placed school shows all postcodes whose closest placed school is over the max dist - set in the "Max Distance" box. A placed school is BACA, PACA and Longhill as the council data shows these are the only schools that will have spare places after offer day
+          </p>
+          <p style={{ marginBottom: '1rem' }}>
+            The Schools drop down allows you see a distance map to the selected school.
+          </p>
+          <p></p>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog} color="primary">
+            Got it!
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Grid container spacing={2} style={{ height: '100%' }}>
         <Grid item xs={2} style={{ height: '100%' }}>
           <div style={{ backgroundColor: 'white', overflowY: 'auto', padding: '10px' }}>
@@ -186,6 +228,37 @@ const Map = () => {
                   >
                   {dest.renderRoute ? "Hide Route" : "Show Route"}
                   </button>
+                  <button
+                  onClick={() => {
+                    const formattedPostcode = routes.postcode?.replace(/ /g, '+').toUpperCase();
+                    const startLat = Array.isArray(routes.startPoint) ? routes.startPoint[0] : routes.startPoint.lat;
+                    const startLng = Array.isArray(routes.startPoint) ? routes.startPoint[1] : routes.startPoint.lng;
+                    const schoolLat = dest.location.lat;
+                    const schoolLng = dest.location.lng;
+                    // get the current date
+                    const today = new Date();
+                    const tomorrow = new Date(today);
+                    tomorrow.setDate(today.getDate() + 1);
+                    const yyyyMmDd = tomorrow.toISOString().split('T')[0];
+                    const url = `https://www.buses.co.uk/directions?origin%5Bname%5D=${formattedPostcode}&origin%5Blocation%5D%5Blat%5D=${startLat}&origin%5Blocation%5D%5Blon%5D=${startLng}&destination%5Bname%5D=School&destination%5Blocation%5D%5Blat%5D=${schoolLat}&destination%5Blocation%5D%5Blon%5D=${schoolLng}&time%5Bwhen%5D=arrive&time%5Bdate%5D=${yyyyMmDd}&time%5Btime%5D=09%3A00`;
+                    window.open(url, 'us route');
+                  }}
+                  style={{
+                    backgroundColor: 'black',
+                    color: 'white',
+                    border: 'none',
+                    padding: '1px 2px',
+                    textAlign: 'center',
+                    textDecoration: 'none',
+                    display: 'inline-block',
+                    fontSize: '10px',
+                    margin: '2px 2px',
+                    cursor: 'pointer',
+                    borderRadius: '1px'
+                    }}
+                  >
+                    "Bus route"
+                  </button>
                 </div>
                 <div style={{ paddingLeft: '1rem' }}>{dest.distance.toFixed(2)} miles</div>
                 <div style={{ paddingLeft: '1rem' }}>{dest.duration.toFixed(2)} minutes</div>
@@ -198,6 +271,22 @@ const Map = () => {
             <Toolbar style={{ paddingTop: '10px', paddingBottom: '10px', alignItems: 'center', justifyContent: 'flex-start', gap: '10px' }}>
               <Typography variant="h6" style={{ flexGrow: 0 }}>
               </Typography>
+                {/* <FormControl variant="outlined" style={{ minWidth: 120, marginLeft: '10px' }}>
+                  <InputLabel id="journey-type-select-label">Journey Type</InputLabel>
+                  <Select
+                    labelId="journey-type-select-label"
+                    id="journey-type-select"
+                    value={journeyType}
+                    onChange={(event) => {
+                      setJourneyType(event.target.value as JourneyType);
+                      setSortedPostcodes([...sortedPostcodes]); // force a render
+                    }}
+                    label="Journey Type"
+                  >
+                    <MenuItem value="walking">Walking</MenuItem>
+                    <MenuItem value="bus">Bus</MenuItem>
+                  </Select>
+                </FormControl> */}
                 <FormControl variant="outlined">
                   <InputLabel id="catchment-select-label">Catchment Boundaries</InputLabel>
                   <Select
@@ -279,7 +368,7 @@ const Map = () => {
             </div>
             )}
           <MapContainer
-            id="map"
+            id={"map" + Date.now()}
             center={[50.84078, -0.14691]}
             zoom={13}
             scrollWheelZoom={true}
@@ -309,8 +398,8 @@ const Map = () => {
               // render the closest school for each marker
               let colour = "blue";
               if (renderOption == RenderOptions.ClosestPlacedSchool && p.journeys) {
-                const closestSchool = p.journeys.filter(j => j.name === p.closestPlacement)[0];
-                if (closestSchool.distance > maxDistance) {
+                const closestSchool = p.journeys[journeyType as keyof Journeys]?.filter(j => j.name === p.closestPlacement)[0];
+                if (closestSchool && closestSchool.distance > maxDistance) {
                   colour = "red";
                 } else {
                   return;
@@ -318,8 +407,8 @@ const Map = () => {
 //                colour = convertDistToColor(closestSchool.distance || 0);
               }
               else if (renderOption > RenderOptions.ShowPostcodes && p.journeys) {
-                const closestSchool = p.journeys[renderOption as number - 2];
-                colour = typeof closestSchool.colour === 'string' ? closestSchool.colour : "blue";
+                const closestSchool = p.journeys[journeyType as keyof Journeys]?.[renderOption as number - 2];
+                colour = closestSchool && typeof closestSchool.colour === 'string' ? closestSchool.colour : "blue";
               }
               return <Marker
                 key={p.postcode}
@@ -327,10 +416,12 @@ const Map = () => {
                 icon={diskIcon(colour)}
                 eventHandlers={{
                   click: () => {
+                    const journeys = p.journeys?.[journeyType as keyof Journeys];
                     setRoutes({
                       id: 0,
                       startPoint: [p.lat, p.lng],
-                      schoolJourneys: p.journeys ? p.journeys.map((j) => ({ ...j, renderRoute: true, id: 0, colour: j.colour || 'white' })) : []
+                      postcode: p.postcode,
+                      schoolJourneys: journeys ? journeys.map((j) => ({ ...j, renderRoute: true, id: 0, colour: j.colour || 'white' })) : []
                     });
                   }}}
                 />
@@ -339,7 +430,8 @@ const Map = () => {
             selectedSchool &&
             sortedPostcodes.map((p: PostcodeData) => {
               // render the distance for each marker to the selected school
-              const distance = p.journeys?.find(j => j.name === selectedSchool)?.distance;
+              const journeys = p.journeys?.[journeyType as keyof Journeys];
+              const distance = journeys?.find(j => j.name === selectedSchool)?.distance;
               const colour = convertDistToColor(distance || 0);
               return <Marker
                 key={p.postcode}
@@ -347,18 +439,26 @@ const Map = () => {
                 icon={diskIcon(colour)}
                 eventHandlers={{
                   click: () => {
+                    const journeys = p.journeys?.[journeyType as keyof Journeys];
                     setRoutes({
                       id: 0,
                       startPoint: [p.lat, p.lng],
-                      schoolJourneys: p.journeys ? p.journeys.map((j) => ({ ...j, renderRoute: true, id: 0, colour: j.colour || 'white' })) : []
+                      schoolJourneys: journeys ? journeys.map((j) => ({ ...j, renderRoute: true, id: 0, colour: j.colour || 'white' })) : []
                     });
                   }}}
                 />
             })}
             {routes.schoolJourneys?.map((dest: JourneyUI) => (
               // render a poly line for the journey to each school in a different color
-              dest.renderRoute && 
+              dest.renderRoute &&
+              <>
               <Polyline key={"p" + dest.name} positions={dest.route} color={dest.colour}/>
+              {/* <Marker 
+                key={"m" + dest.name}
+                position={routes.startPoint}
+                icon={diskIcon("red")}
+                />*/}
+              </>
             ))}
           </MapContainer>
         </Grid>
