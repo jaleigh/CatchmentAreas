@@ -18,13 +18,13 @@ services:
     build:
       context: ./thirdparty/openrouteservice
     container_name: ors-app
-    mem_limit: 8g
+    mem_limit: 12g
     networks:
       - catchments
     ports:
       - "8080:8082"  # Expose the ORS API on port 8080
       - "9001:9001"  # Expose additional port for monitoring (optional)
-    image: openrouteservice/openrouteservice:v8.0.0
+    image: local/openrouteservice:latest #openrouteservice/openrouteservice:v9.0.0
     # Advanced option! If you different ids to 0:0 and 1000:1000, you have to rebuild the container with the build args UID,GID.
     # The user command is useful if you want easier bind mount access or better security.
     #user: "1000:1000" # Run "mkdir -p ors-docker/config ors-docker/elevation_cache ors-docker/files ors-docker/graphs ors-docker/logs && sudo chown -R 1000:1000 ors" before starting the container!
@@ -32,7 +32,7 @@ services:
       - ./thirdparty/ors_data:/home/ors  # Mount the ORS application directory (for logs, graphs, elevation_cache, etc.) into its own directory
     environment:
       REBUILD_GRAPHS: False  # Set to True to rebuild graphs on container start.
-      CONTAINER_LOG_LEVEL: INFO  # Log level for the container. Possible values: DEBUG, INFO, WARNING, ERROR, CRITICAL
+      CONTAINER_LOG_LEVEL: DEBUG  # Log level for the container. Possible values: DEBUG, INFO, WARNING, ERROR, CRITICAL
       ORS_CONFIG_LOCATION: ./ors_data/config/ors-config.yml  # Location of your ORS configuration file in the docker container
 
       # ------------------ JAVA OPTS ------------------ #
