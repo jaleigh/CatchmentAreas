@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.webpack.css";
 import "leaflet-defaulticon-compatibility";
 import { MapContainer, Marker, Popup, TileLayer, useMapEvents, Polyline } from "react-leaflet";
-import { schools } from "../../data/schools";
+import { schools, School } from "../../data/schools";
 import { useState, useEffect } from 'react';
 import { LatLngExpression } from "leaflet";
 import L from 'leaflet';
@@ -19,6 +19,7 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
+import { ChevronLeftOutlined } from "@mui/icons-material";
 
 interface JourneyUI extends Journey {
   renderRoute: boolean;
@@ -38,7 +39,8 @@ enum RenderOptions {
   SecondClosestSchool = 3,
   ThirdClosestSchool = 4,
   showDistanceMap = 5,
-  ClosestPlacedSchool = 6
+  ClosestPlacedSchool = 6,
+  CatchmentSchoolDist = 7
 };
 
 enum RenderCaptchmentOptions {
@@ -75,6 +77,29 @@ const loadCatchmentBoudaries = async () => {
     "old": { catchments: oldCatchments.catchments },
     "new": { catchments: newCatchments.catchments }
   } as CatchmentSet;
+};
+
+// Finds the furthest away catchment school
+const findFurthestCatchmentSchool = (postcode: PostcodeData, useNewCatchment: boolean) => {
+  let maxDist = 0;
+  let furthestSchool = '';
+  for (let n=0; n < schools.length; ++n) {
+    const school = schools[n];
+    const catchment = useNewCatchment ? postcode.newCatchment : postcode.oldCatchment;
+    if (school.catchment !== catchment || !postcode?.journeys?.walking) {
+      continue;
+    }
+    for (const journey of postcode.journeys.walking) {
+      if (journey.name === school.name) {
+        if (journey.distance > maxDist) {
+          maxDist = journey.distance;
+          furthestSchool = school.name;
+        }
+      }
+    }
+  }
+
+  return maxDist;
 };
 
 const Map = () => {
@@ -157,14 +182,14 @@ const Map = () => {
     return `rgb(${red},${green},0)`;
   };
 
-  const handleCloseDialog = () => {
-    setInfoDialogOpen(false); // Close the dialog
+  const toogleInfoBox = () => {
+    setInfoDialogOpen(!infoDialogOpen); // Close the dialog
   };
 
   return (
     <>
       {/* Info Dialog */}
-      <Dialog open={infoDialogOpen} onClose={handleCloseDialog}>
+      <Dialog id="d" open={infoDialogOpen} onClose={toogleInfoBox}>
         <DialogTitle>Welcome to the Map</DialogTitle>
         <DialogContent>
           <p style={{ marginBottom: '1rem' }}>
@@ -175,13 +200,16 @@ const Map = () => {
             Click on the bus route to load the Brighon and Hove bus website for that postcode to school journey.
           </p>
           <p style={{ marginBottom: '1rem' }}>
-            Use the dropdowns to change the catchment boundaries overlays (these aren't exact).
+            Use the dropdowns to change the catchment boundaries overlays (these aren't exact as the council don't provide the data).
           </p>
           <p style={{ marginBottom: '1rem' }}>
-            The Render options drop down allows you to see the closest school, 2nd closest school, 3rd closest school for each postcode.
+            The Render options drop down allows you to see the closest school, 2nd closest school, 3rd closest school for each postcode. School colour code is on the left.
           </p>
           <p style={{ marginBottom: '1rem' }}>
-            The closest placed school shows all postcodes whose closest placed school is over the max dist - set in the "Max Distance" box. A placed school is BACA, PACA and Longhill as the council data shows these are the only schools that will have spare places after offer day
+            The closest placed school shows all postcodes whose closest placed school is over the max dist - set in the "Max Distance" box. A placed school is BACA, PACA and Longhill as the council data shows these are the only schools that will have spare places for displaced pupils.
+          </p>
+          <p style={{ marginBottom: '1rem' }}>
+            Catchment School Dist displays a red dot for any postcode whose furthest away catchment school is over max dist - set in the "Max Distance box". Distances are in miles.
           </p>
           <p style={{ marginBottom: '1rem' }}>
             The Schools drop down allows you see a distance map to the selected school.
@@ -189,7 +217,7 @@ const Map = () => {
           <p></p>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} color="primary">
+          <Button onClick={toogleInfoBox} color="primary">
             Got it!
           </Button>
         </DialogActions>
@@ -207,7 +235,7 @@ const Map = () => {
             </ul>
             <h2 style={{ fontWeight: 'bold', paddingTop: '10px' }}>Route Information</h2>
             {routes.schoolJourneys?.map((dest: JourneyUI) => (
-              <div key={dest.name} style={{ marginBottom: '1rem' }}>
+              <div key={"dd" + dest.name} style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontWeight: 'bold', color: dest.colour }}>{dest.name} - {dest.journeyType}</div>
                   <button 
@@ -239,6 +267,11 @@ const Map = () => {
                     const today = new Date();
                     const tomorrow = new Date(today);
                     tomorrow.setDate(today.getDate() + 1);
+                    if (today.getDay() === 5) { // Check if today is Friday
+                      tomorrow.setDate(today.getDate() + 3); // Set to next Monday
+                    } else if (today.getDay() === 6) { // Check if today is Saturday
+                      tomorrow.setDate(today.getDate() + 2); // Set to next Monday
+                    }
                     const yyyyMmDd = tomorrow.toISOString().split('T')[0];
                     const url = `https://www.buses.co.uk/directions?origin%5Bname%5D=${formattedPostcode}&origin%5Blocation%5D%5Blat%5D=${startLat}&origin%5Blocation%5D%5Blon%5D=${startLng}&destination%5Bname%5D=School&destination%5Blocation%5D%5Blat%5D=${schoolLat}&destination%5Blocation%5D%5Blon%5D=${schoolLng}&time%5Bwhen%5D=arrive&time%5Bdate%5D=${yyyyMmDd}&time%5Btime%5D=09%3A00`;
                     window.open(url, 'us route');
@@ -320,6 +353,7 @@ const Map = () => {
                     <MenuItem value={RenderOptions.SecondClosestSchool}>2nd Closest School</MenuItem>
                     <MenuItem value={RenderOptions.ThirdClosestSchool}>3rd Closest School</MenuItem>
                     <MenuItem value={RenderOptions.ClosestPlacedSchool}>Closest Placed School</MenuItem>
+                    <MenuItem value={RenderOptions.CatchmentSchoolDist}>Catchment School Dist</MenuItem>
                   </Select>
                 </FormControl>
                 <FormControl variant="outlined" style={{ minWidth: 120, marginLeft: '10px' }}>
@@ -348,7 +382,7 @@ const Map = () => {
                   onChange={(event) => setMaxDistance(parseFloat(event.target.value))}
                   style={{ padding: '2px', marginLeft: '10px', width: '150px' }}
                 />
-                <Tooltip title="Select a school from the drop down to see how far each postcode is from that school, anything over the max distance is bright red, bright green is less that 1 mile\nClosest placed school displays a red dot if you are over max dist from the closest school which the council says will have space, i.e. BACA, PACA or Longhill. Click on a postcode to see the route to the schools">
+                <Tooltip title="Help" onClick={toogleInfoBox}>
                   <IconButton color="inherit">
                     <HelpOutlineIcon />
                   </IconButton>
@@ -379,34 +413,40 @@ const Map = () => {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             {schools.map((school) => (
-              <Marker key={school.name} position={[school.lat, school.lng]}>
-                <Popup>{school.name}</Popup>
+              <Marker key={"s" + school.name} position={[school.lat, school.lng]}>
+                <Popup key={"ss" + school.name}>{school.name}</Popup>
               </Marker>
             ))}
             <MapClickHandler />
             {renderCatchments != RenderCaptchmentOptions.HideCatchments && (
               (renderCatchments == RenderCaptchmentOptions.NewCatchments ? catchments.new.catchments : catchments.old.catchments).map((boundary: CatchmentBoundary) => (
-              <Polyline key={boundary.name} positions={boundary.coordinates} color="grey" />
+              <Polyline key={"c" + boundary.name} positions={boundary.coordinates} color="grey" />
               ))
             )}
             {(renderOption == RenderOptions.ShowPostcodes ||
              renderOption == RenderOptions.ClosestSchool ||
              renderOption == RenderOptions.SecondClosestSchool ||
              renderOption == RenderOptions.ThirdClosestSchool ||
-             renderOption == RenderOptions.ClosestPlacedSchool) && 
+             renderOption == RenderOptions.ClosestPlacedSchool ||
+             renderOption == RenderOptions.CatchmentSchoolDist) && 
              sortedPostcodes.map((p: PostcodeData) => {
               // render the closest school for each marker
               let colour = "blue";
               if (renderOption == RenderOptions.ClosestPlacedSchool && p.journeys) {
                 const closestSchool = p.journeys[journeyType as keyof Journeys]?.filter(j => j.name === p.closestPlacement)[0];
-                if (closestSchool && closestSchool.distance > maxDistance) {
+                if (closestSchool && closestSchool.distance > maxDistance && (p.newCatchment === 'StringerVarndean' || p.newCatchment === 'BlatchingtonHove')) {
                   colour = "red";
                 } else {
                   return;
                 }
 //                colour = convertDistToColor(closestSchool.distance || 0);
-              }
-              else if (renderOption > RenderOptions.ShowPostcodes && p.journeys) {
+              } else if (renderOption == RenderOptions.CatchmentSchoolDist && p.journeys) {
+                if (findFurthestCatchmentSchool(p, renderCatchments === RenderCaptchmentOptions.NewCatchments) >  maxDistance) {
+                  colour = "red";
+                } else {
+                  return;
+                }
+              } else if (renderOption > RenderOptions.ShowPostcodes && p.journeys) {
                 const closestSchool = p.journeys[journeyType as keyof Journeys]?.[renderOption as number - 2];
                 colour = closestSchool && typeof closestSchool.colour === 'string' ? closestSchool.colour : "blue";
               }
@@ -453,11 +493,11 @@ const Map = () => {
               dest.renderRoute &&
               <>
               <Polyline key={"p" + dest.name} positions={dest.route} color={dest.colour}/>
-              {/* <Marker 
+              <Marker 
                 key={"m" + dest.name}
                 position={routes.startPoint}
                 icon={diskIcon("red")}
-                />*/}
+                />
               </>
             ))}
           </MapContainer>

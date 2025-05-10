@@ -1,7 +1,7 @@
 {
   "catchments": [
     {
-      "name": "VarndeanStringer",
+      "name": "StringerVarndean",
       "coordinates": [
         [
           50.852020931290795,
@@ -395,7 +395,7 @@
       ]
     },
     {
-      "name": "BACA",
+      "name": "BrightonAldridge",
       "coordinates": [
         [
           50.835118607493605,
@@ -697,7 +697,7 @@
       ]
     },
     {
-      "name": "HoveBlatchington",
+      "name": "BlatchingtonHove",
       "coordinates": [
         [
           50.814340213530116,
@@ -902,7 +902,7 @@
       ]
     },
     {
-      "name": "PACA",
+      "name": "Portslade",
       "coordinates": [
         [
           50.82388202322903,
