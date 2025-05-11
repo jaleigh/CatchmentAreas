@@ -233,7 +233,7 @@ const Map = () => {
                 </li>
               ))}
             </ul>
-            <h2 style={{ fontWeight: 'bold', paddingTop: '10px' }}>Route Information</h2>
+            <h2 style={{ fontWeight: 'bold', paddingTop: '10px' }}>Route Information {routes.postcode}</h2>
             {routes.schoolJourneys?.map((dest: JourneyUI) => (
               <div key={"dd" + dest.name} style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
